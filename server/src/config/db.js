@@ -12,7 +12,10 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
     connectionString : process.env.DATABASE_URL,
     max: 10,
-    idleTimeoutMillis: 30000
+    idleTimeoutMillis: 30000,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 //to test connection
 async function testConnection() {
@@ -27,18 +30,18 @@ async function testConnection() {
 testConnection();
 
 // for query log files
-const logFilePath = path.join(process.cwd(), 'logs/query.log')
+// const logFilePath = path.join(process.cwd(), 'logs/query.log')
 
-async function logToFile(logMessage) {
-  const timestamp = new Date().toISOString();
-  const fullMessage = `[${timestamp}] ${logMessage}\n`;
+// async function logToFile(logMessage) {
+//   const timestamp = new Date().toISOString();
+//   const fullMessage = `[${timestamp}] ${logMessage}\n`;
 
-    try {
-        await fsp.appendFile(logFilePath, fullMessage);
-    } catch (e) {
-        console.error('Failed to write query log: ', e);
-    }
-}
+//     try {
+//         await fsp.appendFile(logFilePath, fullMessage);
+//     } catch (e) {
+//         console.error('Failed to write query log: ', e);
+//     }
+// }
 
 // to query database through pool
 async function query(queryText, parameters) {
@@ -46,12 +49,12 @@ async function query(queryText, parameters) {
         const result = await pool.query(queryText, parameters);
 
         // console.log(`Executed query : `, {queryText, rows: result.rowCount});
-        const logMessage = `Executed query: ${queryText} |
-        Parameters: ${JSON.stringify(parameters)} | 
-        Rows affected: ${result.rowCount}
-        `;
-        // console.log(logMessage);
-        logToFile(logMessage)
+        // const logMessage = `Executed query: ${queryText} |
+        // Parameters: ${JSON.stringify(parameters)} | 
+        // Rows affected: ${result.rowCount}
+        // `;
+        // // console.log(logMessage);
+        // logToFile(logMessage)
 
         return result;
     } catch (e) {

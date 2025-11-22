@@ -73,7 +73,7 @@ const SubmitComplaint = () => {
 
     try {
       const response = await complaintService.fileComplaint(formData);
-      
+
       if (response.success) {
         toast.success('Complaint filed successfully!');
         navigate('/complaints');
@@ -94,9 +94,9 @@ const SubmitComplaint = () => {
     setIsLoading(true);
     try {
       const response = await complaintService.supportComplaint(existingComplainId, confirmDuplicate);
-      
+
       if (response.success) {
-        
+
         if (confirmDuplicate) {
           toast.success('You supported an existing complaint!');
         } else {
@@ -110,36 +110,36 @@ const SubmitComplaint = () => {
       setIsLoading(false);
     }
   };
-// In client/src/pages/SubmitComplaint.jsx
-const handleFileNewComplaint = async () => {
-  if (!formData.description || !formData.latitude || !formData.longitude || !formData.photo || formData.tags.length === 0) {
-    toast.error('Please fill all required fields!');
-    return;
-  }
-
-  setIsLoading(true);
-  try {
-    // Add fileNewAnyway flag to bypass similar complaints check
-    const complaintData = {
-      ...formData,
-      fileNewAnyway: true
-    };
-    
-    const response = await complaintService.fileComplaint(complaintData);
-    if (response.success) {
-      toast.success('Complaint filed successfully!');
-      navigate('/complaints');
-    } else {
-      toast.error('Failed to file new complaint');
+  // In client/src/pages/SubmitComplaint.jsx
+  const handleFileNewComplaint = async () => {
+    if (!formData.description || !formData.latitude || !formData.longitude || !formData.photo || formData.tags.length === 0) {
+      toast.error('Please fill all required fields!');
+      return;
     }
-  } catch (error) {
-    toast.error(error.response?.data?.message || 'Failed to file new complaint');
-  } finally {
-    setIsLoading(false);
-  }
-};
 
-// dsfsdfsd
+    setIsLoading(true);
+    try {
+      // Add fileNewAnyway flag to bypass similar complaints check
+      const complaintData = {
+        ...formData,
+        fileNewAnyway: true
+      };
+
+      const response = await complaintService.fileComplaint(complaintData);
+      if (response.success) {
+        toast.success('Complaint filed successfully!');
+        navigate('/complaints');
+      } else {
+        toast.error('Failed to file new complaint');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to file new complaint');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // dsfsdfsd
 
 
 
@@ -152,51 +152,51 @@ const handleFileNewComplaint = async () => {
             <FiAlertCircle className="text-yellow-500 w-8 h-8 mr-3" />
             <h1 className="text-2xl font-bold text-nepal-blue">Similar Complaints Found</h1>
           </div>
-          
+
           <p className="text-gray-600 mb-6">
             We found similar complaints in your area. Would you like to support an existing complaint or file a new one?
           </p>
 
           <div className="space-y-4 mb-6">
             {similarComplaints.map((complaint) => (
-             <div key={complaint.id} className="border border-gray-200 rounded-lg p-4">
-  <p className="font-semibold">{complaint.description}</p>
+              <div key={complaint.id} className="border border-gray-200 rounded-lg p-4">
+                <p className="font-semibold">{complaint.description}</p>
 
-  {complaint.url && (
-    <img
-      src={complaint.url}
-      alt="Complaint evidence"
-      className="w-full h-48 object-cover rounded-lg mt-3"
-    />
-  )}
+                {complaint.url && (
+                  <img
+                    src={complaint.url}
+                    alt="Complaint evidence"
+                    className="w-full h-48 object-cover rounded-lg mt-3"
+                  />
+                )}
 
-  <div className="flex flex-wrap gap-2 mt-2">
-    {complaint.tags.map(tag => (
-      <span key={tag} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-        {tag}
-      </span>
-    ))}
-  </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {complaint.tags.map(tag => (
+                    <span key={tag} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
 
-  <button
-    onClick={() => handleSimilarComplaintAction(true, complaint.id)}
-    className="mt-3 bg-nepal-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800"
-  >
-    Support This Complaint
-  </button>
-</div>
+                <button
+                  onClick={() => handleSimilarComplaintAction(true, complaint.id)}
+                  className="mt-3 bg-nepal-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800"
+                >
+                  Support This Complaint
+                </button>
+              </div>
 
             ))}
           </div>
 
           <div className="flex gap-4">
- <button
-  onClick={handleFileNewComplaint} // use the new function
-  className="bg-nepal-red text-white px-6 py-2 rounded-lg hover:bg-red-700"
->
-  File New Complaint Anyway
-</button>
-{/* gerg */}
+            <button
+              onClick={handleFileNewComplaint} // use the new function
+              className="bg-nepal-red text-white px-6 py-2 rounded-lg hover:bg-red-700"
+            >
+              File New Complaint Anyway
+            </button>
+            {/* gerg */}
 
             <button
               onClick={() => navigate('/complaints')}
@@ -214,7 +214,7 @@ const handleFileNewComplaint = async () => {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="bg-white rounded-2xl shadow-lg p-6">
         <h1 className="text-2xl font-bold text-nepal-blue mb-6">File New Complaint</h1>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Description */}
           <div>
@@ -290,11 +290,10 @@ const handleFileNewComplaint = async () => {
                         key={tag}
                         type="button"
                         onClick={() => handleTagSelect(tag)}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          formData.tags.includes(tag)
-                            ? 'bg-nepal-blue text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-1 rounded-full text-sm ${formData.tags.includes(tag)
+                          ? 'bg-nepal-blue text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
                       >
                         {tag}
                       </button>

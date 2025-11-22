@@ -77,7 +77,43 @@ const passwordResetMail = async (email, code) => {
   }
 };
 
-export { registerEmailVerificationMail, passwordResetMail };
+// for sending mail to concerned users (citizen) to notify them that their complaint has been resolved
+const sendComplaintResolvedMail = async (emails, complaintId, complaintDescription) => {
+    if (!Array.isArray(emails) || emails.length === 0) {
+        throw new Error('Emails must be a non-empty array');
+    }
+
+    const subject = 'Complaint Resolved Successfully';
+    const htmlBody = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #28A745;">Complaint Resolved</h2>
+            <p>Dear Citizen,</p>
+            <p>We’re pleased to inform you that your complaint 
+               <strong>(ID: ${complaintId}, ${complaintDescription})</strong> has been successfully resolved.</p>
+            <p>Our team has reviewed and addressed the issue you reported. 
+               We appreciate your patience and cooperation throughout the process.</p>
+            <p>If you have any further concerns or feedback, please don’t hesitate to reach out.</p>
+            <hr style="border:none; border-top:1px solid #ccc; margin: 20px 0;">
+            <p style="font-size: 12px; color: #999;">Thank you for helping us improve our services.<br>Smart Palika Team</p>
+        </div>
+    `;
+
+    try {
+        const sendPromises = emails.map(async (email) => {
+            const mailOptions = PutMailOptions(email, subject, htmlBody);
+            return transporter.sendMail(mailOptions);
+        });
+
+        const results = await Promise.all(sendPromises);
+        return results;
+    } catch (error) {
+        console.error('Error in sending complaint resolved emails:', error);
+        throw error;
+    }
+};
+
+
+export { registerEmailVerificationMail, passwordResetMail, sendComplaintResolvedMail};
 
 
 // Example info Output (Gmail + SMTP)

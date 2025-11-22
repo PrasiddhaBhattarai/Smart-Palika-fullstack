@@ -4,6 +4,7 @@
 import { query } from "../config/db.js";
 import { findWardFromLocation } from "../utils/ward_locator.js";
 import { deleteFromCloudinary } from "../helper/coudinary_helper.js";
+import { sendComplaintResolvedMail } from "../helper/nodemailer.js";
 
 // i) File complaint
 const file_complaint = async (req, res) => {
@@ -198,70 +199,107 @@ const delete_complaint = async (req, res) => {
 
 // iii) Update status (admin of that ward only)
 const update_status = async (req, res) => {
-  try {
-    const admin = req.userInfo;
-    const id = parseInt(req.params.id, 10);
-    const { status } = req.body;
+    try {
+        const admin = req.userInfo;
+        const id = parseInt(req.params.id, 10);
+        const { status } = req.body;
 
-    // Allowed status values
-    const validStatuses = ['registered','under_review','assigned','in_progress','resolved'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status value. Allowed: " + validStatuses.join(", ")
-      });
+        // Allowed status values
+        const validStatuses = ['registered', 'under_review', 'assigned', 'in_progress', 'resolved'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid status value. Allowed: " + validStatuses.join(", ")
+            });
+        }
+
+        // Fetch the complaint
+        const result = await query(`SELECT * FROM complaints WHERE id = $1`, [id]);
+        const complaint = result.rows[0];
+
+        if (!complaint) {
+            return res.status(404).json({
+                success: false,
+                message: "Complaint not found."
+            });
+        }
+
+        // Authorization check
+        const isWardAdmin = admin.role === 'ward_admin' && admin.ward_id === complaint.ward_id && !complaint.escalated_to_municipality;
+        const isMunicipalityAdmin = admin.role === 'municipality_admin' && complaint.escalated_to_municipality;
+
+        if (!isWardAdmin && !isMunicipalityAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to update this complaint"
+            });
+        }
+
+        if (complaint.status === "resolved") {
+            return res.status(400).json({
+                success: false,
+                message: "Complaint is already marked resolved"
+            });
+        }
+
+        // Update status
+        const updateFields = [`status = $1`];
+        const values = [status, id];
+        if (status === "resolved") {
+            updateFields.push(`resolved_at = CURRENT_TIMESTAMP`);
+        }
+
+        const sql = `UPDATE complaints SET ${updateFields.join(", ")} WHERE id = $2`;
+        await query(sql, values);
+
+        // send email to related users if complait is resolved
+        let allSent = false;
+        if (status == 'resolved') {
+            try {
+                const {rows} = await query(
+                    `SELECT u.email
+                    FROM complaint_supporters cs
+                    JOIN users u ON cs.user_id = u.id
+                    WHERE cs.complaint_id = $1`,
+                    [id]
+                );
+                if (rows.length === 0) {
+                    console.log('No supporters found for this complaint.');
+                    return;
+                }
+
+                // Extract emails into an array
+                const emails = rows.map(row => row.email);
+
+                const results = await sendComplaintResolvedMail(emails, id, complaint.description);
+
+                // Check if all emails were accepted
+                allSent = results.every(info => info.accepted && info.accepted.length > 0);
+
+            } catch (error) {
+                console.error('Error fetching supporter emails and sending confirmation mail:', error);
+                throw error;
+            }
+        }
+
+        if (!allSent) {
+            res.status(200).json({
+                success: true,
+                message: "Complaint status updated."
+            });
+        }else{
+            res.status(200).json({
+                success: true,
+                message: "Complaint resolved and mail sent."
+            });
+        }
+    } catch (error) {
+        console.error("Error in update_complaint_status!", error);
+        res.status(500).json({
+            success: false,
+            message: 'Some error occurred! Please try again'
+        });
     }
-
-    // Fetch the complaint
-    const result = await query(`SELECT * FROM complaints WHERE id = $1`, [id]);
-    const complaint = result.rows[0];
-
-    if (!complaint) {
-      return res.status(404).json({
-        success: false,
-        message: "Complaint not found."
-      });
-    }
-
-    // Authorization check
-    const isWardAdmin = admin.role === 'ward_admin' && admin.ward_id === complaint.ward_id && !complaint.escalated_to_municipality;
-    const isMunicipalityAdmin = admin.role === 'municipality_admin' && complaint.escalated_to_municipality;
-
-    if (!isWardAdmin && !isMunicipalityAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to update this complaint"
-      });
-    }
-
-    if (complaint.status === "resolved") {
-      return res.status(400).json({
-        success: false,
-        message: "Complaint is already marked resolved"
-      });
-    }
-
-    // Update status
-    const updateFields = [`status = $1`];
-    const values = [status, id];
-    if (status === "resolved") {
-      updateFields.push(`resolved_at = CURRENT_TIMESTAMP`);
-    }
-
-    const sql = `UPDATE complaints SET ${updateFields.join(", ")} WHERE id = $2`;
-    await query(sql, values);
-
-    res.status(200).json({
-      success: true,
-      message: "Complaint status updated."
-    });
-  } catch (error) {
-    console.error("Error in update_complaint_status!", error);
-    res.status(500).json({
-      success: false,
-      message: 'Some error occurred! Please try again'
-    });
-  }
 };
 
 
@@ -271,7 +309,7 @@ const update_status = async (req, res) => {
 const escalate_to_municipality = async (req, res) => {
     try {
         const admin = req.userInfo;
-        const id  = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id, 10);
 
         const result = await query(`SELECT * FROM complaints WHERE id = $1`, [id]);
         const complaint = result.rows[0];
@@ -310,7 +348,7 @@ const escalate_to_municipality = async (req, res) => {
 const rate_complaint = async (req, res) => {
     try {
         const user = req.userInfo;
-        const id  = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id, 10);
         const { rating, feedback } = req.body;
 
         if (!rating || rating < 1 || rating > 5) {
@@ -399,49 +437,48 @@ const rate_complaint = async (req, res) => {
 }
 
 // v) Support complaint (only once per user)
-// const support_complaint = async (req, res) => {
-//   try {
-//     const user = req.userInfo;
-//     const complaintId = parseInt(req.params.id, 10);
+const support_complaint = async (req, res) => {
+  try {
+    const user = req.userInfo;
+    const complaintId = parseInt(req.params.id, 10);
 
-//     const exists = await query(`
-//       INSERT INTO complaint_supporters (complaint_id, user_id)
-//       SELECT $1, $2
-//       WHERE NOT EXISTS (
-//         SELECT 1 FROM complaint_supporters WHERE complaint_id = $1 AND user_id = $2
-//       )
-//       RETURNING supported_at
-//     `, [complaintId, user.id]);
+    const exists = await query(`
+      INSERT INTO complaint_supporters (complaint_id, user_id)
+      SELECT $1, $2
+      WHERE NOT EXISTS (
+        SELECT 1 FROM complaint_supporters WHERE complaint_id = $1 AND user_id = $2
+      )
+      RETURNING supported_at
+    `, [complaintId, user.id]);
 
-//     if (exists.rowCount === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "You have already supported this complaint."
-//       });
-//     }
+    if (exists.rowCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already supported this complaint."
+      });
+    }
 
-//     const countRes = await query(`
-//       SELECT COUNT(*) AS supporter_count
-//       FROM complaint_supporters
-//       WHERE complaint_id = $1
-//     `, [complaintId]);
+    const countRes = await query(`
+      SELECT COUNT(*) AS supporter_count
+      FROM complaint_supporters
+      WHERE complaint_id = $1
+    `, [complaintId]);
 
-//     const supporterCount = parseInt(countRes.rows[0].supporter_count, 10);
+    const supporterCount = parseInt(countRes.rows[0].supporter_count, 10);
 
-//     return res.status(200).json({
-//       success: true,
-//       message: "Support recorded.",
-//       supporter_count: supporterCount
-//     });
-//   } catch (error) {
-//     console.error("Error in support_complaint:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error while supporting complaint."
-//     });
-//   }
-// };
- // yo thapeko aaja
+    return res.status(200).json({
+      success: true,
+      message: "Support recorded.",
+      supporter_count: supporterCount
+    });
+  } catch (error) {
+    console.error("Error in support_complaint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while supporting complaint."
+    });
+  }
+};
 
 
 export {
@@ -449,6 +486,6 @@ export {
     delete_complaint,
     update_status,
     escalate_to_municipality,
-    rate_complaint
-    // support_complaint //yo thapeko aaja
+    rate_complaint,
+    support_complaint 
 }
