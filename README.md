@@ -4,8 +4,8 @@
 This project is a comprehensive civic complaint management system that facilitates the management of complaints from the community.
 
 ## Documentation Links
-- **Backend Documentation:** [Backend Documentation Link](#)
-- **Frontend Documentation:** [Frontend Documentation Link](#)
+- **Backend Documentation:** [/server/README.md](/server/README.md)
+- **Frontend Documentation:** [/client/README.md](/client/README.md)
 
 ## Features Overview
 - User registration and authentication
